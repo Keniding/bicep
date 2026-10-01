@@ -15,6 +15,10 @@ param location string = resourceGroup().location
 param workload string = 'demoavm'
 param principalId string
 
+@description('Tipo del principal al que se le da acceso de lectura de secretos (User al probar manualmente, ServicePrincipal/ManagedIdentity en CI)')
+@allowed(['User', 'ServicePrincipal', 'ForeignGroup', 'Group', 'Device'])
+param principalType string = 'ServicePrincipal'
+
 var suffix = uniqueString(resourceGroup().id)
 
 module law 'br/public:avm/res/operational-insights/workspace:0.16.1' = {
@@ -34,7 +38,7 @@ module kv 'br/public:avm/res/key-vault/vault:0.14.2' = {
       {
         principalId: principalId
         roleDefinitionIdOrName: 'Key Vault Secrets User'
-        principalType: 'ServicePrincipal'
+        principalType: principalType
       }
     ]
     diagnosticSettings: [
