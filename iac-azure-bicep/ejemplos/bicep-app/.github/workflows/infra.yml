@@ -1,0 +1,110 @@
+# Pipeline de infraestructura Bicep con OIDC (sin secretos de larga duración)
+# Requiere: App Registration / UAMI con federated credential para este repo
+# y los secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID.
+name: infra-bicep
+
+on:
+  pull_request:
+    paths: ['infra/**', 'ejemplos/bicep-app/**']
+  push:
+    branches: [main]
+    paths: ['infra/**', 'ejemplos/bicep-app/**']
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # necesario para OIDC
+  contents: read
+  pull-requests: write
+
+env:
+  LOCATION: eastus2
+  WORKDIR: ejemplos/bicep-app
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint + build
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          az bicep install
+          az bicep version
+          az bicep lint --file main.bicep
+          az bicep build --file main.bicep --stdout > /dev/null
+          az bicep build-params --file params/main.dev.bicepparam --stdout > /dev/null
+
+  whatif-dev:
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if (dev)
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deployment
+          operation: whatIf
+          name: demo-dev-${{ github.run_number }}
+          scope: subscription
+          location: ${{ env.LOCATION }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          template-file: ${{ env.WORKDIR }}/main.bicep
+          parameters-file: ${{ env.WORKDIR }}/params/main.dev.bicepparam
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/main'
+    needs: whatif-dev
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deployment stack (dev)
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deploymentStack
+          operation: create
+          name: stk-demo-dev
+          scope: subscription
+          location: ${{ env.LOCATION }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          template-file: ${{ env.WORKDIR }}/main.bicep
+          parameters-file: ${{ env.WORKDIR }}/params/main.dev.bicepparam
+          action-on-unmanage-resources: delete
+          deny-settings-mode: denyDelete
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: prod   # protegido con required reviewers en GitHub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deployment stack (prod)
+        uses: azure/bicep-deploy@v2
+        with:
+          type: deploymentStack
+          operation: create
+          name: stk-demo-prod
+          scope: subscription
+          location: ${{ env.LOCATION }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          template-file: ${{ env.WORKDIR }}/main.bicep
+          parameters-file: ${{ env.WORKDIR }}/params/main.prod.bicepparam
+          action-on-unmanage-resources: detach
+          deny-settings-mode: denyWriteAndDelete

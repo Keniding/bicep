@@ -1,0 +1,248 @@
+{
+  "predictedResources": [
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2",
+      "type": "Microsoft.Resources/resourceGroups",
+      "name": "rg-demo-dev-eastus2",
+      "apiVersion": "2025-04-01",
+      "location": "eastus2",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.OperationalInsights/workspaces/log-demo-dev-eastus2",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "name": "log-demo-dev-eastus2",
+      "apiVersion": "2025-07-01",
+      "location": "eastus2",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      },
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30,
+        "features": {
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.Insights/components/appi-demo-dev-eastus2",
+      "type": "Microsoft.Insights/components",
+      "name": "appi-demo-dev-eastus2",
+      "apiVersion": "2020-02-02",
+      "location": "eastus2",
+      "kind": "web",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      },
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.OperationalInsights/workspaces/log-demo-dev-eastus2",
+        "DisableLocalAuth": true
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-demo-dev-eastus2",
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "name": "id-demo-dev-eastus2",
+      "apiVersion": "2024-11-30",
+      "location": "eastus2",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra",
+      "type": "Microsoft.KeyVault/vaults",
+      "name": "kvdemodevqhib2c2cutqra",
+      "apiVersion": "2024-11-01",
+      "location": "eastus2",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      },
+      "properties": {
+        "tenantId": "11111111-1111-1111-1111-111111111111",
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 7,
+        "enablePurgeProtection": null,
+        "publicNetworkAccess": "Enabled",
+        "networkAcls": {
+          "defaultAction": "Allow",
+          "bypass": "AzureServices"
+        }
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra/secrets/sample-secret",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "condition": "[not(empty(parameters('sampleSecretValue')))]",
+      "name": "kvdemodevqhib2c2cutqra/sample-secret",
+      "apiVersion": "2024-11-01",
+      "properties": {
+        "value": "[parameters('sampleSecretValue')]"
+      }
+    },
+    {
+      "id": "[extensionResourceId('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra', 'Microsoft.Authorization/roleAssignments', guid('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('identity-{0}', uniqueString('identity', deployment().name))), '2025-04-01').outputs.principalId.value, 'Key Vault Secrets User'))]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "name": "[guid('/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('identity-{0}', uniqueString('identity', deployment().name))), '2025-04-01').outputs.principalId.value, 'Key Vault Secrets User')]",
+      "apiVersion": "2022-04-01",
+      "properties": {
+        "roleDefinitionId": "[roleDefinitions('Key Vault Secrets User').id]",
+        "principalId": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('identity-{0}', uniqueString('identity', deployment().name))), '2025-04-01').outputs.principalId.value]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.KeyVault/vaults/kvdemodevqhib2c2cutqra/providers/Microsoft.Insights/diagnosticSettings/to-law",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "name": "to-law",
+      "apiVersion": "2021-05-01-preview",
+      "properties": {
+        "workspaceId": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('monitoring-{0}', uniqueString('monitoring', deployment().name))), '2025-04-01').outputs.workspaceId.value]",
+        "logs": [
+          {
+            "categoryGroup": "audit",
+            "enabled": true
+          }
+        ],
+        "metrics": [
+          {
+            "category": "AllMetrics",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.App/managedEnvironments/cae-demo-dev-eastus2",
+      "type": "Microsoft.App/managedEnvironments",
+      "name": "cae-demo-dev-eastus2",
+      "apiVersion": "2025-01-01",
+      "location": "eastus2",
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      },
+      "properties": {
+        "appLogsConfiguration": {
+          "destination": "log-analytics",
+          "logAnalyticsConfiguration": {
+            "customerId": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.OperationalInsights/workspaces', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('monitoring-{0}', uniqueString('monitoring', deployment().name))), '2025-04-01').outputs.workspaceName.value), '2025-07-01').customerId]",
+            "sharedKey": "[listKeys(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.OperationalInsights/workspaces', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('monitoring-{0}', uniqueString('monitoring', deployment().name))), '2025-04-01').outputs.workspaceName.value), '2025-07-01').primarySharedKey]"
+          }
+        },
+        "workloadProfiles": [
+          {
+            "name": "Consumption",
+            "workloadProfileType": "Consumption"
+          }
+        ]
+      }
+    },
+    {
+      "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.App/containerApps/ca-demo-dev-eastus2",
+      "type": "Microsoft.App/containerApps",
+      "name": "ca-demo-dev-eastus2",
+      "apiVersion": "2025-01-01",
+      "location": "eastus2",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('identity-{0}', uniqueString('identity', deployment().name))), '2025-04-01').outputs.id.value)]": {}
+        }
+      },
+      "tags": {
+        "environment": "dev",
+        "owner": "keniding",
+        "costCenter": "CC-0001",
+        "project": "iac-bicep-demo"
+      },
+      "properties": {
+        "environmentId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-demo-dev-eastus2/providers/Microsoft.App/managedEnvironments/cae-demo-dev-eastus2",
+        "workloadProfileName": "Consumption",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 80,
+            "transport": "auto",
+            "allowInsecure": false
+          },
+          "activeRevisionsMode": "Single"
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "app",
+              "image": "mcr.microsoft.com/k8se/quickstart:latest",
+              "resources": {
+                "cpu": 0.25,
+                "memory": "0.5Gi"
+              },
+              "env": [
+                {
+                  "name": "AZURE_CLIENT_ID",
+                  "value": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('identity-{0}', uniqueString('identity', deployment().name))), '2025-04-01').outputs.clientId.value]"
+                },
+                {
+                  "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                  "value": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('monitoring-{0}', uniqueString('monitoring', deployment().name))), '2025-04-01').outputs.appInsightsConnectionString.value]"
+                },
+                {
+                  "name": "KEYVAULT_URI",
+                  "value": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('keyVault-{0}', uniqueString('keyVault', deployment().name))), '2025-04-01').outputs.uri.value]"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 0,
+            "maxReplicas": 3,
+            "rules": [
+              {
+                "name": "http-rule",
+                "http": {
+                  "metadata": {
+                    "concurrentRequests": "50"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "diagnostics": [],
+  "outputs": {
+    "appUrl": "[format('https://{0}', reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('containerApp-{0}', uniqueString('containerApp', deployment().name))), '2025-04-01').outputs.fqdn.value)]",
+    "resourceGroupName": "rg-demo-dev-eastus2",
+    "keyVaultName": "[reference(resourceId('00000000-0000-0000-0000-000000000000', 'rg-demo-dev-eastus2', 'Microsoft.Resources/deployments', format('keyVault-{0}', uniqueString('keyVault', deployment().name))), '2025-04-01').outputs.name.value]"
+  }
+}

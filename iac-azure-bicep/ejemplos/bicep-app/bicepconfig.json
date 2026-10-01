@@ -1,0 +1,39 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-hardcoded-env-urls": { "level": "error" },
+        "no-unused-params": { "level": "warning" },
+        "no-unused-vars": { "level": "warning" },
+        "no-unused-types": { "level": "warning" },
+        "secure-parameter-default": { "level": "error" },
+        "outputs-should-not-contain-secrets": { "level": "error" },
+        "use-recent-api-versions": { "level": "warning", "maxAllowedAgeInDays": 730 },
+        "use-secure-value-for-secure-inputs": { "level": "error" },
+        "secure-params-in-parameters-file": { "level": "error" },
+        "no-hardcoded-location": { "level": "warning" },
+        "explicit-values-for-loc-params": { "level": "off" }
+      }
+    }
+  },
+  "moduleAliases": {
+    "br": {
+      "corp": {
+        "registry": "crplatformshared.azurecr.io",
+        "modulePath": "bicep/modules"
+      }
+    },
+    "ts": {
+      "corpSpecs": {
+        "subscription": "00000000-0000-0000-0000-000000000000",
+        "resourceGroup": "rg-templatespecs"
+      }
+    }
+  },
+  "formatting": {
+    "indentKind": "Space",
+    "indentSize": 2,
+    "insertFinalNewline": true
+  }
+}
