@@ -24,13 +24,13 @@
   "moduleAliases": {
     "br": {
       "corp": {
-        "registry": "crplatformshared.azurecr.io",
+        "registry": "acrbicepdemo9b0f2c1e.azurecr.io",
         "modulePath": "bicep/modules"
       }
     },
     "ts": {
       "corpSpecs": {
-        "subscription": "00000000-0000-0000-0000-000000000000",
+        "subscription": "9b0f2c1e-4e3e-467d-b287-16282ed6a9d7",
         "resourceGroup": "rg-templatespecs"
       }
     }

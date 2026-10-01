@@ -1,0 +1,78 @@
+# Pipeline de infraestructura Bicep con OIDC (sin secretos de larga duración).
+# La identidad (App Registration + federated credential) está acotada por
+# RBAC solo al resource group rg-demo-dev-eastus2 — ver DEMO.md, sección 6.3.
+name: infra-bicep
+
+on:
+  pull_request:
+    paths: ['**.bicep', '**.bicepparam']
+  push:
+    branches: [master]
+    paths: ['**.bicep', '**.bicepparam']
+  workflow_dispatch:
+
+permissions:
+  id-token: write # necesario para OIDC
+  contents: read
+  pull-requests: write
+
+env:
+  LOCATION: eastus2
+  RESOURCE_GROUP: rg-demo-dev-eastus2
+  STACK_NAME: stk-demo-dev
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint + build (no requiere credenciales de Azure)
+        run: |
+          az bicep version
+          az bicep lint --file main.bicep
+          az bicep lint --file main.ci.bicep
+          az bicep build --file main.bicep --stdout > /dev/null
+          az bicep build --file main.ci.bicep --stdout > /dev/null
+          az bicep build-params --file params/main.dev.bicepparam --stdout > /dev/null
+          az bicep build-params --file params/main.ci.bicepparam --stdout > /dev/null
+
+  whatif:
+    needs: lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if contra el resource group existente
+        run: |
+          az deployment group what-if \
+            -g "$RESOURCE_GROUP" \
+            -f main.ci.bicep \
+            -p params/main.ci.bicepparam
+
+  deploy:
+    needs: lint
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deployment stack a nivel de resource group
+        run: |
+          az stack group create \
+            -n "$STACK_NAME" \
+            -g "$RESOURCE_GROUP" \
+            -f main.ci.bicep \
+            -p params/main.ci.bicepparam \
+            --action-on-unmanage deleteResources \
+            --deny-settings-mode denyDelete \
+            --yes
