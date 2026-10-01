@@ -453,6 +453,22 @@ az ad app federated-credential create --id <appId> --parameters - <<'EOF'
 EOF
 ```
 
+> **Hallazgo real (primera corrida falló):** el subject que GitHub presenta
+> para este repo/org no es `repo:Keniding/bicep:ref:...` sino
+> `repo:Keniding@115328041/bicep@1399765739:ref:refs/heads/master` — incluye
+> los IDs inmutables de la organización y del repositorio, no solo sus
+> nombres. El login OIDC falló con `AADSTS700213: No matching federated
+> identity record found` hasta corregir el subject de la credencial federada
+> con `az ad app federated-credential update`. **Para saber el subject exacto
+> que hay que registrar, lo más confiable es leer el error de un intento
+> fallido** (`gh run view <run-id> --log-failed | grep "subject claim"`) en
+> vez de asumir el formato `repo:org/repo:...` de la documentación genérica.
+>
+> También importa qué dispara el token: un job con `environment: dev`
+> presenta el subject `repo:...:environment:dev`, no el `ref:refs/heads/...`
+> — son credenciales distintas. Este workflow evita la ambigüedad sacando
+> `environment:` del job `deploy`.
+
 RBAC — dos roles, los dos acotados únicamente a `rg-demo-dev-eastus2`:
 
 - **Contributor**: gestionar los recursos de la app (Container App, Key Vault,
@@ -463,8 +479,9 @@ RBAC — dos roles, los dos acotados únicamente a `rg-demo-dev-eastus2`:
   la identidad administrada). En vez de dar un rol amplio como "User Access
   Administrator" (que permitiría asignar *cualquier* rol a *cualquier*
   principal en el RG), se creó un rol personalizado con únicamente
-  `Microsoft.Authorization/roleAssignments/{read,write}` y
-  `roleDefinitions/read`:
+  `Microsoft.Authorization/roleAssignments/{read,write}`,
+  `roleDefinitions/read`, y (ver hallazgo abajo)
+  `Microsoft.Resources/deploymentStacks/manageDenySetting/action`:
 
 ```bash
 cat <<EOF > custom-role.json
@@ -474,7 +491,8 @@ cat <<EOF > custom-role.json
   "Actions": [
     "Microsoft.Authorization/roleAssignments/write",
     "Microsoft.Authorization/roleAssignments/read",
-    "Microsoft.Authorization/roleDefinitions/read"
+    "Microsoft.Authorization/roleDefinitions/read",
+    "Microsoft.Resources/deploymentStacks/manageDenySetting/action"
   ],
   "NotActions": [],
   "AssignableScopes": ["/subscriptions/<sub-id>/resourceGroups/rg-demo-dev-eastus2"]
@@ -482,6 +500,19 @@ cat <<EOF > custom-role.json
 EOF
 az role definition create --role-definition custom-role.json
 ```
+
+> **Hallazgo real (segunda corrida falló):** incluso con Contributor y el rol
+> de role assignments, `az stack group create --deny-settings-mode denyDelete`
+> falló con `DeploymentStackActionForbidden` sobre la acción
+> `Microsoft.Resources/deploymentStacks/manageDenySetting/action`. Gestionar
+> el `denySettings` de un deployment stack es una acción separada que
+> **Contributor tampoco incluye** — hay que agregarla explícitamente al rol
+> personalizado. Se actualiza un rol existente con
+> `az role definition update --role-definition archivo.json` (el JSON de
+> *update* usa las claves en minúscula — `roleName`, `assignableScopes`,
+> `permissions[].actions` — a diferencia de `create`, que acepta `Name`,
+> `Actions`, etc. con mayúscula inicial; mezclarlas produce
+> `KeyError: 'roleName'`).
 
 Secrets del repo (`gh secret set`, scope OIDC — no son credenciales de larga
 duración, solo identifican qué identidad federar):
@@ -535,3 +566,12 @@ az role definition delete --name "Bicep CI Role Assignment Writer"
    este escenario — reintentar sin cambios suele resolverlo.
 6. **`main.avm.bicep` corregido:** `principalType` ahora es un parámetro en vez de
    estar fijo en `'ServicePrincipal'`.
+7. **El subject de OIDC de GitHub incluye IDs inmutables** de org/repo
+   (`repo:org@orgId/repo@repoId:ref:...`), no solo sus nombres. El formato
+   `repo:org/repo:...` de la documentación genérica no alcanza para este
+   repositorio — hay que leer el subject exacto del error
+   `AADSTS700213` de una corrida fallida y registrar ese.
+8. **Los deployment stacks con `denySettings != none` necesitan un permiso
+   aparte** (`Microsoft.Resources/deploymentStacks/manageDenySetting/action`)
+   que ni Contributor ni "role assignments write" incluyen — hubo que
+   agregarlo al rol personalizado del pipeline de CI.
