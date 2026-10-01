@@ -331,6 +331,43 @@ Los alias `corp` y `corpSpecs` se definen una sola vez en `bicepconfig.json`
 (`moduleAliases`), así el código no repite el nombre completo del registro en
 cada módulo.
 
+### 6.0 Qué son ACR y MCR (para explicar antes de los comandos)
+
+ACR y MCR son dos **registros** — depósitos donde se guardan módulos de
+Bicep para reutilizarlos — pero con una diferencia clave: quién es el dueño
+y quién puede acceder.
+
+**ACR (Azure Container Registry)** es un depósito **privado**. Es un recurso
+de Azure que hay que crear (y pagar, aunque sea centavos) dentro de la propia
+suscripción. Originalmente está pensado para guardar imágenes de Docker, pero
+también sirve para guardar módulos de Bicep — Bicep los empaqueta con el
+mismo formato (OCI) que una imagen de contenedor. Solo pueden leerlo las
+identidades a las que se les dé permiso explícito (RBAC). Sirve para que una
+organización publique sus propios módulos internos — por ejemplo, "así se
+crea siempre una Key Vault en esta empresa" — y el resto del equipo los
+reutilice sin copiar y pegar código.
+
+**MCR (Microsoft Container Registry)** es el registro **público** de
+Microsoft — ya existe, no se crea. Cualquiera en el mundo puede leerlo sin
+necesitar login ni permisos, y no cuesta nada. Ahí Microsoft publica, entre
+otras cosas, los **Azure Verified Modules (AVM)**: una colección de módulos
+de Bicep oficiales y verificados para los recursos más comunes (Storage
+Account, Key Vault, Log Analytics, etc.), con buenas prácticas de seguridad
+ya aplicadas. En vez de escribir un módulo de Key Vault desde cero, se usa el
+que Microsoft ya probó y mantiene actualizado.
+
+| | ACR | MCR |
+|---|---|---|
+| Dueño | La organización que lo crea | Microsoft |
+| Quién puede leerlo | Solo quien tenga permiso (RBAC) | Cualquiera |
+| Qué guarda | Módulos propios, internos | Módulos oficiales (AVM) |
+| Costo | Sí (es un recurso de Azure) | No |
+
+Es la diferencia entre la biblioteca interna de una empresa (solo empleados,
+con libros que escribió la empresa) y una biblioteca pública (cualquiera
+entra, con libros publicados por una editorial reconocida — en este caso,
+Microsoft).
+
 ### 6.1 ACR privado
 
 ```bash
