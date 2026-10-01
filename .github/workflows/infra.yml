@@ -58,7 +58,6 @@ jobs:
     needs: lint
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: dev
     steps:
       - uses: actions/checkout@v4
       - uses: azure/login@v2

@@ -315,6 +315,201 @@ az stack sub delete -n stk-demo-dev --action-on-unmanage deleteResources --yes
 
 ---
 
+## 6. Compartir código Bicep: local, ACR privado, MCR público y Template Specs
+
+Las cuatro formas de referenciar un módulo en Bicep, probadas todas hoy con
+recursos reales:
+
+| Forma | Sintaxis | Dónde vive |
+|---|---|---|
+| Local | `'modules/identity.bicep'` | En el mismo repo, ruta relativa |
+| ACR privado | `'br/corp:identity:v1'` | Azure Container Registry propio |
+| MCR público (AVM) | `'br/public:avm/res/.../...:0.16.1'` | Registro público de Microsoft |
+| Template Specs | `'ts/corpSpecs:monitoring-module:v1'` | Recurso ARM versionado, con RBAC propio |
+
+Los alias `corp` y `corpSpecs` se definen una sola vez en `bicepconfig.json`
+(`moduleAliases`), así el código no repite el nombre completo del registro en
+cada módulo.
+
+### 6.1 ACR privado
+
+```bash
+ACR_NAME="acrbicepdemo$(az account show --query id -o tsv | tr -d '-' | cut -c1-8)"
+
+az acr create -g rg-demo-dev-eastus2 -n "$ACR_NAME" --sku Basic -l eastus2
+
+# az bicep publish autentica solo con la sesión de az CLI — no hace falta
+# "az acr login" (que además pide Docker Desktop, innecesario para esto)
+az bicep publish --file modules/identity.bicep --target "br:${ACR_NAME}.azurecr.io/bicep/modules/identity:v1" --force
+```
+
+Luego, en `bicepconfig.json`:
+
+```json
+"moduleAliases": {
+  "br": {
+    "corp": {
+      "registry": "acrbicepdemo9b0f2c1e.azurecr.io",
+      "modulePath": "bicep/modules"
+    }
+  }
+}
+```
+
+Con el alias definido, `modules/identity.bicep` publicado como
+`bicep/modules/identity:v1` se referencia como `br/corp:identity:v1` (sin
+repetir `bicep/modules`, porque ya es parte del alias).
+
+### 6.2 Template Specs
+
+```bash
+az group create -n rg-templatespecs -l eastus2
+
+az ts create \
+  -g rg-templatespecs \
+  -n monitoring-module \
+  -v v1 \
+  -l eastus2 \
+  -f modules/monitoring.bicep \
+  --display-name "Log Analytics + App Insights" \
+  --yes
+```
+
+Y en `bicepconfig.json`:
+
+```json
+"moduleAliases": {
+  "ts": {
+    "corpSpecs": {
+      "subscription": "<subscription-id>",
+      "resourceGroup": "rg-templatespecs"
+    }
+  }
+}
+```
+
+Se referencia como `ts/corpSpecs:monitoring-module:v1`.
+
+### 6.3 Probar las cuatro juntas
+
+`acr-demo.bicep` (en la raíz del repo) consume las cuatro formas en un solo
+archivo — local, ACR, MCR público y Template Specs — y se usó hoy para
+comprobar que las cuatro resuelven y despliegan de verdad:
+
+```bash
+az bicep restore --file acr-demo.bicep --force
+az bicep build --file acr-demo.bicep --stdout > /dev/null
+
+# Despliegue real de prueba, en un RG descartable
+az group create -n rg-acr-ts-test -l eastus2
+az deployment group create -g rg-acr-ts-test -f acr-demo.bicep
+
+# Limpieza
+az group delete -n rg-acr-ts-test --yes --no-wait
+```
+
+Resultado verificado: `provisioningState: Succeeded` con los cuatro módulos
+desplegados.
+
+### 6.4 GitHub Actions con OIDC (sin secretos de larga duración)
+
+El pipeline (`.github/workflows/infra.yml`) corre lint/build en cada cambio,
+`what-if` en pull requests, y despliega en push a `master` — autenticado por
+**OIDC federado** (sin client secret guardado en ningún lado) a través de una
+identidad acotada **solo** al resource group `rg-demo-dev-eastus2`, no a toda
+la suscripción.
+
+Por qué hace falta `main.ci.bicep` en vez de `main.bicep` para CI: `main.bicep`
+tiene `targetScope = 'subscription'` porque crea el resource group — eso
+requiere permisos a nivel de suscripción. Como la identidad del pipeline está
+acotada al RG (ya existente), `main.ci.bicep` es la misma plantilla pero con
+`targetScope = 'resourceGroup'`, sin el paso de crear el RG. Los nombres de
+recursos se derivan igual (`resourceName()`/`compactName()`), así que
+actualiza los mismos recursos que ya existen en vez de duplicarlos.
+
+Identidad creada para el pipeline:
+
+```bash
+# App Registration + Service Principal
+az ad app create --display-name "github-oidc-bicep-demo"
+az ad sp create --id <appId>
+
+# Federated credentials: una para push a master, otra para pull requests
+az ad app federated-credential create --id <appId> --parameters - <<'EOF'
+{
+  "name": "github-master-branch",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:Keniding/bicep:ref:refs/heads/master",
+  "audiences": ["api://AzureADTokenExchange"]
+}
+EOF
+az ad app federated-credential create --id <appId> --parameters - <<'EOF'
+{
+  "name": "github-pull-requests",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:Keniding/bicep:pull_request",
+  "audiences": ["api://AzureADTokenExchange"]
+}
+EOF
+```
+
+RBAC — dos roles, los dos acotados únicamente a `rg-demo-dev-eastus2`:
+
+- **Contributor**: gestionar los recursos de la app (Container App, Key Vault,
+  Log Analytics, etc.).
+- **Un rol personalizado mínimo** (no "User Access Administrator"): Contributor
+  excluye explícitamente `Microsoft.Authorization/*/Write`, y el despliegue
+  necesita crear exactamente un role assignment (Key Vault Secrets User para
+  la identidad administrada). En vez de dar un rol amplio como "User Access
+  Administrator" (que permitiría asignar *cualquier* rol a *cualquier*
+  principal en el RG), se creó un rol personalizado con únicamente
+  `Microsoft.Authorization/roleAssignments/{read,write}` y
+  `roleDefinitions/read`:
+
+```bash
+cat <<EOF > custom-role.json
+{
+  "Name": "Bicep CI Role Assignment Writer",
+  "IsCustom": true,
+  "Actions": [
+    "Microsoft.Authorization/roleAssignments/write",
+    "Microsoft.Authorization/roleAssignments/read",
+    "Microsoft.Authorization/roleDefinitions/read"
+  ],
+  "NotActions": [],
+  "AssignableScopes": ["/subscriptions/<sub-id>/resourceGroups/rg-demo-dev-eastus2"]
+}
+EOF
+az role definition create --role-definition custom-role.json
+```
+
+Secrets del repo (`gh secret set`, scope OIDC — no son credenciales de larga
+duración, solo identifican qué identidad federar):
+
+```bash
+gh secret set AZURE_CLIENT_ID --body "<appId>" --repo Keniding/bicep
+gh secret set AZURE_TENANT_ID --body "$(az account show --query tenantId -o tsv)" --repo Keniding/bicep
+gh secret set AZURE_SUBSCRIPTION_ID --body "$(az account show --query id -o tsv)" --repo Keniding/bicep
+```
+
+Seguimiento de una corrida en vivo:
+
+```bash
+gh run list --repo Keniding/bicep --limit 5
+gh run watch <run-id> --repo Keniding/bicep --exit-status
+```
+
+### 6.5 Limpieza de lo agregado en esta sección
+
+```bash
+az acr delete -n "$ACR_NAME" -g rg-demo-dev-eastus2 --yes
+az group delete -n rg-templatespecs --yes --no-wait
+az ad app delete --id <appId>   # borra también el Service Principal asociado
+az role definition delete --name "Bicep CI Role Assignment Writer"
+```
+
+---
+
 ## Resumen de hallazgos (para mencionar en la demo)
 
 1. **Owner no implica acceso a datos.** Azure RBAC separa plano de control
